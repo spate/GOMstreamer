@@ -2,4 +2,5 @@
 EMAIL='youremail@example.com'
 PASSWORD='PASSWORD'
 QUALITY='SQTest'
-python ./gomsaver.py -e $EMAIL -p $PASSWORD -q $QUALITY
+OUTPUTFILE='dump.ogm'
+python ./gomparser.py -e $EMAIL -p $PASSWORD -q $QUALITY -o $OUTPUTFILE
