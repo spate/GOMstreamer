@@ -29,6 +29,13 @@ from optparse import OptionParser
 from string import Template
 
 
+class GomParserError(Exception):
+    def __init__(self, value):
+        self.parameter = value
+    def __str__(self):
+        return str(self.parameter)
+
+
 def parseHTML(response, quality):
     # Seeing what we've received from GOMtv
     logging.debug("Response:")
@@ -42,8 +49,7 @@ def parseHTML(response, quality):
         urlFromHTML = re.sub(r"\" \+ playType \+ \"", quality, urlFromHTML)
         urlFromHTML = re.sub(r"\"[^;]+;", "", urlFromHTML)
     except AttributeError:
-        print "Error: Unable to find the majority of the GOMtv XML URL on the Live page."
-        sys.exit(0)
+        raise GomParserError("Error: Unable to find the majority of the GOMtv XML URL on the Live page.")
 
     # Finding the title of the stream, probably not necessary but
     # done for completeness
@@ -53,8 +59,7 @@ def parseHTML(response, quality):
         titleFromHTML = re.search(r"\"(.*)\"", titleFromHTML).group(0)
         titleFromHTML = re.sub(r"\"", "", titleFromHTML)
     except AttributeError:
-        print "Error: Unable to find the stream title on the Live page."
-        sys.exit(0)
+        raise GomParserError("Error: Unable to find the stream title on the Live page.")
 
     return (urlFromHTML + titleFromHTML)
 
@@ -65,16 +70,14 @@ def parseStreamURL(response, quality):
 
     # The response for the GOX XML if an incorrect stream quality is chosen is 1002.
     if (response == "1002"):
-        print "Error: A premium ticket is required to watch higher quality streams, please choose 'SQTest' instead."
-        sys.exit(0)
+        raise GomParserError("Error: A premium ticket is required to watch higher quality streams, please choose 'SQTest' instead.")
 
     # Grabbing the gomcmd URL
     try:
         streamPattern = r'<REF href="([^"]*)"/>'
         regexResult = re.search(streamPattern, response).group(1)
     except AttributeError:
-        print "Error: Unable to find the gomcmd URL in the GOX XML file."
-        sys.exit(0)
+        raise GomParserError("Error: Unable to find the gomcmd URL in the GOX XML file.")
 
     # If we are using a premium ticket, we don't need to parse the URL further
     # we just need to clean it up a bit
@@ -92,8 +95,7 @@ def parseStreamURL(response, quality):
         regexResult = re.sub(r'&amp;', '&', regexResult) # Removing &amp;
         regexResult = re.sub(r'&quot;', '', regexResult) # Removing &quot;
     except AttributeError:
-        print "Error: Unable to extract the HTTP stream from the gomcmd URL."
-        sys.exit(0)
+        raise GomParserError("Error: Unable to extract the HTTP stream from the gomcmd URL.")
 
     return regexResult
 
@@ -123,8 +125,7 @@ def retrieveGomURL(email, password, quality):
     response = urllib2.urlopen(request)
 
     if len(cookiejar) == 0:
-        print "Authentification failed. Please check your login and password."
-        sys.exit(1)
+        raise GomParserError("Authentification failed. Please check your login and password.")
 
     # Collecting data on the Live streaming page
     request = urllib2.Request(gomtvLiveURL)
@@ -132,8 +133,7 @@ def retrieveGomURL(email, password, quality):
     url = parseHTML(response.read(), quality)
 
     if len(url) == 0:
-        print "Unable to find URL on the Live streaming page. Is the stream available?"
-        sys.exit(404)  # Giving a status of 404 due to no streams found
+        raise GomParserError("Unable to find URL on the Live streaming page. Is the stream available?")
 
     logging.debug("Printing URL on Live page:")
     logging.debug(url)
@@ -152,10 +152,7 @@ def retrieveGomURL(email, password, quality):
     url = parseStreamURL(responseData, quality)
 
     if url == None:
-        print "Unable to parse the URL to find the HTTP video stream."
-        print "url:", url
-        print ""
-        sys.exit(1)
+        raise GomParserError("Unable to parse the URL to find the HTTP video stream.")
 
     return url
 
@@ -204,10 +201,10 @@ def main():
     (options, args) = parser.parse_args()
 
     # Printing out parameters
-    logging.debug("Email: " + options.email)
-    logging.debug("Password: " + options.password)
-    logging.debug("Quality: " + options.quality)
-    logging.debug("Command: " + options.command)
+    logging.debug("Email: %s" % options.email)
+    logging.debug("Password: %s" % options.password)
+    logging.debug("Quality: %s" % options.quality)
+    logging.debug("Command: %s" % options.command)
 
     # Stopping if email and password are defaults found in play.sh/save.sh
     if options.email == "youremail@example.com" and options.password == "PASSWORD":
@@ -215,11 +212,16 @@ def main():
         print "This script will not work correctly without a valid account."
         sys.exit(1)
 
-    # Log in and retrieve Gom stream URL
-    url = retrieveGomURL(options.email, options.password, options.quality)
+    try:
+        # Log in and retrieve Gom stream URL
+        url = retrieveGomURL(options.email, options.password, options.quality)
 
-    # Generate VLC commandline
-    cmd = generateVLCCmd(options.command, url, options.cache, options.outputFile)
+        # Generate VLC commandline
+        cmd = generateVLCCmd(options.command, url, options.cache, options.outputFile)
+    except GomParserError, (err):
+        print err
+        exit(1)
+
     print "Stream URL:", url
     print ""
     print "VLC command:", cmd
