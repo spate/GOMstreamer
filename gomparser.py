@@ -24,15 +24,15 @@ import StringIO
 import re
 import os
 import sys
+import logging
 from optparse import OptionParser
 from string import Template
 
 
 def parseHTML(response, quality):
     # Seeing what we've received from GOMtv
-    if debug:
-        print "Response:"
-        print response
+    logging.debug("Response:")
+    logging.debug(response)
 
     # Parsing through the live page for a link to the gox XML file.
     # Quality is simply passed as a URL parameter e.g. HQ, SQ, SQTest
@@ -60,9 +60,8 @@ def parseHTML(response, quality):
 
 def parseStreamURL(response, quality):
     # Observing the GOX XML file containing the stream link
-    if debug:
-        print "GOX XML:"
-        print response
+    logging.debug("GOX XML:")
+    logging.debug(response)
 
     # The response for the GOX XML if an incorrect stream quality is chosen is 1002.
     if (response == "1002"):
@@ -136,20 +135,18 @@ def retrieveGomURL(email, password, quality):
         print "Unable to find URL on the Live streaming page. Is the stream available?"
         sys.exit(404)  # Giving a status of 404 due to no streams found
 
-    if debug:
-        print "Printing URL on Live page:"
-        print url
-        print ""
+    logging.debug("Printing URL on Live page:")
+    logging.debug(url)
+    logging.debug("")
 
     # Grab the response of the URL listed on the Live page for a stream
     request = urllib2.Request(url)
     response = urllib2.urlopen(request)
     responseData = response.read()
 
-    if debug:
-        print "Response:"
-        print responseData
-        print ""
+    logging.debug("Response:")
+    logging.debug(responseData)
+    logging.debug("")
 
     # Find out the URL found in the response
     url = parseStreamURL(responseData, quality)
@@ -191,9 +188,6 @@ def generateVLCCmd(command, url, cache, outputFile):
 
 def main():
 
-    global debug
-    debug = False  # Set this to true to print debugging information
-
     # Collecting options parsed in from the command line
     parser = OptionParser()
     parser.add_option("-p", "--password", dest = "password", help = "Password to your GOMtv account")
@@ -210,11 +204,10 @@ def main():
     (options, args) = parser.parse_args()
 
     # Printing out parameters
-    if debug:
-        print "Email: ", options.email
-        print "Password: ", options.password
-        print "Quality: ", options.quality
-        print "Command: ", options.command
+    logging.debug("Email: " + options.email)
+    logging.debug("Password: " + options.password)
+    logging.debug("Quality: " + options.quality)
+    logging.debug("Command: " + options.command)
 
     # Stopping if email and password are defaults found in play.sh/save.sh
     if options.email == "youremail@example.com" and options.password == "PASSWORD":
