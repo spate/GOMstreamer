@@ -106,7 +106,7 @@ def parseStreamURL(response, quality):
 #  quality:   SQTest,SQ,HQ
 def retrieveGomURL(email, password, quality):
     gomtvURL = "http://www.gomtv.net"
-    gomtvLiveURL = gomtvURL + "/2011gstl1/live/"
+    gomtvLiveURL = gomtvURL + "/2011gslsponsors2/live/"
     gomtvSignInURL = gomtvURL + "/user/loginProcess.gom"
     values = {
              'cmd': 'login',
