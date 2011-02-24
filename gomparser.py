@@ -160,7 +160,7 @@ def retrieveGomURL(email, password, quality):
 def generateVLCCmd(command, url, cache, outputFile):
     # Application locations and parameters for different operating systems.
     # May require changing on OSX, can't test.
-    vlcOSX = '/Applications/VLC.app/Contents/MacOS/VLC "--http-caching=$cache" "$url"'
+    vlcOSX = '/Applications/VLC.app/Contents/MacOS/VLC "$url" "--http-caching=$cache"'
     vlcLinux = 'vlc "--http-caching=$cache" "$url"'
 
     if not command:
