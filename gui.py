@@ -21,10 +21,12 @@ import wx
 import ConfigParser
 import gomparser
 import subprocess
+import logging
+import re
 from wx import xrc
 
-
-CONFIG_FILENAME = "gui.cfg"
+CONFIG_FILENAME = "config"
+GUI_XRC_FILENAME = "gui.xrc"
 CACHE = 30000
 
 DEFAULT_CONFIG = {
@@ -38,7 +40,7 @@ DEFAULT_CONFIG = {
 class GOMApp(wx.App):
     def OnInit(self):
         # load xml resources
-        self.res = xrc.XmlResource('gui.xrc')  # TODO: platform-specific resources, if need be
+        self.res = xrc.XmlResource(GUI_XRC_FILENAME)  # TODO: platform-specific resources, if need be
         self.frame = self.res.LoadFrame(None, 'GOMFrame')
 
         self.email = xrc.XRCCTRL(self.frame, "email")
@@ -144,6 +146,43 @@ class GOMApp(wx.App):
 
 
 if __name__ == "__main__":
+    # Uncomment the following line to enable debug output:
+    #logging.getLogger().setLevel(logging.DEBUG)
+
+    if os.name == 'posix' and os.uname()[0] == 'Darwin':
+        is_mac = True
+    else:
+        is_mac = False
+
+    # platform directories
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    if is_mac:
+        # On the Mac, this is the preferred place to put config files:
+        config_dir = os.path.expandvars('$HOME/Library/Application Support/GOMstreamer')
+    elif os.name == 'posix':
+        # On Linux, this is standard:
+        config_dir = os.path.expandvars('$HOME/.GOMstreamer')
+
+    # create config directory
+    if not os.path.exists(config_dir):
+        os.mkdir(config_dir, 0700)
+
+    # set the config filename.
+    CONFIG_FILENAME = config_dir + "/config"
+
+
+    # On the mac, check if we're in a .app bundle, and if so,
+    # pull our resources from the appropriate directory.
+    if is_mac:
+        if re.search(r'.*\.app/Contents/MacOS$', script_dir):
+            GUI_XRC_FILENAME = script_dir + "/../Resources/" + GUI_XRC_FILENAME
+
+    logging.debug("path: %s" % os.getcwd())
+    logging.debug("scriptdir: %s" % script_dir)
+    logging.debug("CONFIG_FILENAME: %s" % CONFIG_FILENAME)
+    logging.debug("GUI_XRC_FILENAME: %s" % GUI_XRC_FILENAME)
+
     app = GOMApp(redirect=False)
     app.MainLoop()
 

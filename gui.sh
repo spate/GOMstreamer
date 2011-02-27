@@ -4,13 +4,9 @@
 # (Necessary for Snow Leopard)
 export VERSIONER_PYTHON_PREFER_32_BIT=yes
 
-SCRIPTNAME=`readlink $0`
-if [ -z "$SCRIPTNAME" ]
-then
-  SCRIPTNAME="$0"
-fi
-SCRIPTPATH=`dirname $SCRIPTNAME`
-GUI=$SCRIPTPATH/gui.py
+PKGBIN=`basename $0`
+PKGPATH=`echo $0 | sed "s/$PKGBIN//"`
+PKGPATH=`cd $PKGPATH && pwd`
 
-python $GUI $@
+python "${PKGPATH}/gui.py"
 
