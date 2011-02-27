@@ -159,7 +159,6 @@ def retrieveGomURL(email, password, quality):
 
 def generateVLCCmd(command, url, cache, outputFile):
     # Application locations and parameters for different operating systems.
-    # May require changing on OSX, can't test.
     vlcOSX = '/Applications/VLC.app/Contents/MacOS/VLC "$url" "--http-caching=$cache"'
     vlcLinux = 'vlc "--http-caching=$cache" "$url"'
 
@@ -177,7 +176,11 @@ def generateVLCCmd(command, url, cache, outputFile):
                   }
     cmd = command.substitute(commandArgs)
     if outputFile:
-        cmd = cmd + " :demux=dump :demuxdump-file=\"" + outputFile + "\""
+        # For some reason the Mac VLC commandline parser's a bit tricky..
+        if os.name == 'posix' and os.uname()[0] == 'Darwin':
+            cmd = cmd + " --demux=dump --demuxdump-file=\"" + outputFile + "\""
+        else:
+            cmd = cmd + " :demux=dump :demuxdump-file=\"" + outputFile + "\""
     cmd = cmd + " vlc://quit"
 
     return cmd
