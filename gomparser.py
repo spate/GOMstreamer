@@ -235,5 +235,8 @@ def main():
 
 # Actually run the script
 if __name__ == "__main__":
+    # Uncomment the following line to enable debug output:
+    #logging.getLogger().setLevel(logging.DEBUG)
+
     main()
 
