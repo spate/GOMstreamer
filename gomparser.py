@@ -104,9 +104,9 @@ def parseStreamURL(response, quality):
 #  email:     youremail@example.com
 #  password:  password
 #  quality:   SQTest,SQ,HQ
-def retrieveGomURL(email, password, quality):
+def retrieveGomURL(email, password, season_id, quality):
     gomtvURL = "http://www.gomtv.net"
-    gomtvLiveURL = gomtvURL + "/2011gslsponsors2/live/"
+    gomtvLiveURL = gomtvURL + "/" + season_id + "/live/"
     gomtvSignInURL = gomtvURL + "/user/loginProcess.gom"
     values = {
              'cmd': 'login',
@@ -114,6 +114,8 @@ def retrieveGomURL(email, password, quality):
              'mb_username': email,
              'mb_password': password
              }
+    logging.debug("live url: %s" % gomtvLiveURL)
+    logging.debug("sign-in url: %s" % gomtvSignInURL)
 
     data = urllib.urlencode(values)
     cookiejar = cookielib.LWPCookieJar()
@@ -217,7 +219,7 @@ def main():
 
     try:
         # Log in and retrieve Gom stream URL
-        url = retrieveGomURL(options.email, options.password, options.quality)
+        url = retrieveGomURL(options.email, options.password, "2011gslsponsors2", options.quality)
 
         # Generate VLC commandline
         cmd = generateVLCCmd(options.command, url, options.cache, options.outputFile)
