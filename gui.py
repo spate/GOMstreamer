@@ -263,7 +263,7 @@ class GOMApp(wx.App):
 
         # Generate the curl command
         subs = { "h":self.cfg["stream_http_auth"], "u":url, "f":filename }
-        cmd = Template("curl -A '$h' \"$u\" > $f").substitute(subs)
+        cmd = Template("curl -A '$h' \"$u\" > \"$f\"").substitute(subs)
 
         logging.debug("Executing curl: %s" % cmd)
         self.process_curl = subprocess.Popen(cmd, shell=True)
@@ -291,7 +291,7 @@ class GOMApp(wx.App):
 
         # Generate the curl command
         subs = { "h":self.cfg["stream_http_auth"], "u":url, "f":CONFIG_PIPE }
-        cmd = Template("curl -A '$h' \"$u\" > $f").substitute(subs)
+        cmd = Template("curl -A '$h' \"$u\" > \"$f\"").substitute(subs)
 
         logging.debug("Executing curl: %s" % cmd)
         self.process_curl = subprocess.Popen(cmd, shell=True)
