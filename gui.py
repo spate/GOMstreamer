@@ -24,7 +24,7 @@ import gomparser
 import subprocess
 import logging
 import re
-import time
+import time, datetime
 from wx import xrc
 from string import Template
 
@@ -104,6 +104,9 @@ class GOMApp(wx.App):
         self.frame.Bind(wx.EVT_BUTTON, self.OnSaveLocOpen, id=xrc.XRCID('saveLocBtn'))
         self.frame.Bind(wx.EVT_TEXT, self.OnTextChange, id=xrc.XRCID('filenameSchemeTxt'))
 
+        self.frame.timer = wx.Timer(self.frame, -1)
+        self.frame.Bind(wx.EVT_TIMER, self.Update)
+
         # load config
         def find_choice(control, val):
           i = 0
@@ -124,11 +127,17 @@ class GOMApp(wx.App):
         if len(time_list) == 2:
           self.laterHourCho.SetSelection(find_choice(self.laterHourCho, time_list[0]))
           self.laterMinuteCho.SetSelection(find_choice(self.laterMinuteCho, time_list[1]))
-        self.laterTZCho.SetSelection(find_choice(self.laterTZCho, self.cfg["later_record_timezone"]))
+        ### FIXME: Timezone functionality unimplemented due to lack of pytz on Mac
+        #self.laterTZCho.SetSelection(find_choice(self.laterTZCho, self.cfg["later_record_timezone"]))
+        self.laterTZCho.SetSelection(find_choice(self.laterTZCho, "KST"))
+        self.laterTZCho.Enable(False)
+
         self.laterRecordDateBox.SetValue("True" == self.cfg["later_record_date_use"])
         self.laterRecordWatchBox.SetValue("True" == self.cfg["later_record_and_play"])
 
-        ### recDateEn, recDate
+        ### FIXME: Recording date picking
+        self.laterRecordDateBox.Enable(False)
+        self.laterRecordDatePkr.Enable(False)
 
         self.qualityCho.SetSelection(find_choice(self.qualityCho, self.cfg["stream_quality"]))
         self.seasonIdTxt.SetValue(self.cfg["stream_season"])
@@ -146,6 +155,9 @@ class GOMApp(wx.App):
         ## Subprocesses
         self.process_curl = None
         self.process_vlc = None
+
+        ## Recording time
+        self.UpdateRecordingTime()
 
         # show window
         self.frame.Fit()
@@ -175,6 +187,8 @@ class GOMApp(wx.App):
             xrc.XRCID('laterRecordWatchBox') : "later_record_and_play" }
         config_entry = tb[event.GetId()]
         self.cfg[config_entry] = str(event.GetEventObject().GetValue())
+        if event.GetId() in [xrc.XRCID('laterRecordBox'), xrc.XRCID('laterRecordDateBox')]:
+            self.UpdateRecordingTime()
 
     def OnPlayerLocOpen(self, event):
         def_path = ""
@@ -209,15 +223,70 @@ class GOMApp(wx.App):
         self.cfg["stream_quality"] = self.qualityCho.GetStringSelection()
 
     def OnRecordTimeChange(self, event):
+        logging.debug("Updating recording time")
         self.cfg["later_record_time"] = (self.laterHourCho.GetStringSelection() + ":" +
                                          self.laterMinuteCho.GetStringSelection())
         self.cfg["later_record_timezone"] = self.laterTZCho.GetStringSelection()
+        self.UpdateRecordingTime()
 
+    def UpdateRecordingTime(self):
+        self.alarm_set = ("True" == self.cfg["later_record"])
+        logging.debug("alarm set: %s" % self.alarm_set)
+        if self.alarm_set:
+            self.alarm_time = 0
+            # Mac Python doesn't include pytz, and local timezone envvar isn't set.
+            # So we seriously can't do timezone conversions here.. grr.
+            if self.cfg["later_record_timezone"] == "KST":
+                logging.debug("Setting up alarm for KST")
+                now_timestamp = time.gmtime()
+                cur_date = datetime.datetime(*now_timestamp[:6])
+                logging.debug("Current UTC date: %s" % str(cur_date))
+                rec_datetime = datetime.datetime.strptime(self.cfg["later_record_time"], "%H:%M")
+                logging.debug("Undated KST record time: %s" % str(rec_datetime))
+                rec_datetime = rec_datetime - datetime.timedelta(hours=9)  # convert to UTC
+                rec_datetime = rec_datetime.replace(year=cur_date.year, month=cur_date.month, day=cur_date.day)
+                logging.debug("Corrected UTC record time:%s" % str(rec_datetime))
+                while rec_datetime < cur_date:
+                    rec_datetime = rec_datetime + datetime.timedelta(hours=24)
+                self.alarm_time = rec_datetime
+                self.alarm_set = True
+                self.frame.timer.Start(1000)
+                logging.debug("Alarm set for %s" % str(self.alarm_time))
+
+                timestr = self.alarm_time - cur_date
+                self.statusTxt.SetValue("Recording in %s" % str(timestr).rsplit(".")[0])
+            else:
+                logging.debug("unknown timezone \"%s\"" % self.cfg["later_record_timezone"])
+        else:
+            # alarm was turned off..
+            self.frame.timer.Stop()
+            self.statusTxt.SetValue("Ready")
+
+    def Update(self, event):
+        if self.alarm_set:
+            now_time = datetime.datetime.utcnow()
+            logging.debug("Current UTC time: %s" % str(now_time))
+            if now_time > self.alarm_time:
+                logging.debug("Time to record! Turning off alarm so it doesn't fire again")
+                self.alarm_set = False
+                self.alarm_time = 0
+                self.laterRecordBox.SetValue(False)
+                self.cfg['later_record'] = False
+                self.frame.timer.Stop()
+
+                # trigger recording/playback
+                self.OnSaveStream(None)
+            else:
+                # update the GUI counter
+                timestr = self.alarm_time - now_time
+                self.statusTxt.SetValue("Recording in %s" % str(timestr).rsplit(".")[0])
+        else:
+            logging.debug("ticking without reason?")
 
     def GetStreamURL(self):
         now = time.time()
         if self.gomStreamTS and self.gomStreamTS + (5*60) > now:
-          return self.gomStreamURL
+            return self.gomStreamURL
 
         try:
             self.gomStreamURL = gomparser.retrieveGomURL(self.cfg["id_email"], self.cfg["id_password"],
@@ -248,6 +317,12 @@ class GOMApp(wx.App):
         self.process_vlc = None
 
     def OnSaveStream(self, event):
+        record_and_play = False
+        if event and self.cfg['now_record_and_play'] == "True":
+            record_and_play = True
+        elif not event and self.cfg['later_record_and_play'] == "True":
+            record_and_play = True
+
         # cleanup!
         self.TerminateSubprocesses()
 
@@ -273,12 +348,16 @@ class GOMApp(wx.App):
           logging.debug("curl quit pretty quick.. bailing.")
 
         # Generate player command
-        player = self.GetPlayerBinary()
-        subs = { "p":player, "f":filename }
-        cmd = Template("$p \"stream://$f\"").substitute(subs)
+        if record_and_play:
+            player = self.GetPlayerBinary()
+            subs = { "p":player, "f":filename }
+            cmd = Template("$p \"stream://$f\"").substitute(subs)
 
-        logging.debug("Executing VLC: %s" % cmd)
-        self.process_vlc = subprocess.Popen(cmd, shell=True)
+            logging.debug("Executing VLC: %s" % cmd)
+            self.process_vlc = subprocess.Popen(cmd, shell=True)
+            self.statusTxt.SetValue("Recording and playing stream")
+        else:
+            self.statusTxt.SetValue("Recording stream")
 
 
     def OnPlayStream(self, event):
@@ -304,7 +383,7 @@ class GOMApp(wx.App):
         logging.debug("Executing VLC %s" % cmd)
         self.process_vlc = subprocess.Popen(cmd, shell=True)
 
-
+        self.statusTxt.SetValue("Playing stream")
 
 
 if __name__ == "__main__":
